@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html>
+ <head>
+  <title>InnerTune DB Fix</title>
+  <script defer src="https://cdnjs.cloudflare.com/ajax/libs/jszip/3.10.1/jszip.min.js"></script>
+  <script src="https://sql.js.org/dist/sql-wasm.js"></script>
+  <style>
+   body {
+    font-family: sans-serif;
+   }
+   #zipFile {
+    display: block;
+    margin-bottom: 10px;
+   }
+   #status {
+    margin-top: 10px;
+   }
+  </style>
+ </head>
+ <body>
+  <h1>InnerTune DB Fix</h1>
+  <input type="file" id="zipFile" accept=".backup" />
+  <div id="status"></div>
+  <script>
+   const fileInput = document.getElementById("zipFile");
+   const statusDiv = document.getElementById("status");
+
+   async function initSqlJsAndModifyZip() {
+    const SQL = await initSqlJs({
+     locateFile: (file) => `https://sql.js.org/dist/${file}`,
+    });
+
+    fileInput.addEventListener("change", async () => {
+     const zipFile = fileInput.files[0];
+
+     if (zipFile) {
+      statusDiv.textContent = "Loading and fixing backup...";
+
+      try {
+       const zip = new JSZip();
+       await zip.loadAsync(zipFile);
+
+       const fileToModify = zip.file("song.db");
+       if (fileToModify) {
+        const originalContent = await fileToModify.async("arraybuffer");
+        const uInt8Array = new Uint8Array(originalContent);
+        const db = new SQL.Database(uInt8Array);
+
+        db.run("PRAGMA user_version = 12;");
+        db.run("UPDATE room_master_table SET identity_hash = '8db3d5731dbcc716a90427d4dde63c66' WHERE id = 42");
+
+        const modifiedContent = db.export();
+        zip.file(fileToModify.name, modifiedContent);
+
+        db.close();
+       } else {
+        throw new Error("song.db not found in the zip file.");
+       }
+
+       const modifiedZip = await zip.generateAsync({
+        mimeType: "application/x-backup",
+        type: "blob",
+        compression: "DEFLATE",
+        compressionOptions: {
+         level: 9
+        }
+       });
+       saveAs(modifiedZip, "InnerTune_fixed.backup");
+       statusDiv.textContent = "Backup fixed and saved!";
+      } catch (error) {
+       console.error("Error modifying zip:", error);
+       statusDiv.textContent = "An error occurred while fixing the backup.";
+      }
+     } else {
+      statusDiv.textContent = "Please select a zip file.";
+     }
+    });
+   }
+
+   function saveAs(blob, name) {
+    const downloadLink = document.createElement("a");
+    downloadLink.href = URL.createObjectURL(blob);
+    downloadLink.setAttribute("download", name);
+
+    downloadLink.click();
+   }
+
+   initSqlJsAndModifyZip();
+  </script>
+ </body>
+</html>
