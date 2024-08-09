@@ -32,6 +32,7 @@
 
     fileInput.addEventListener("change", async () => {
      const zipFile = fileInput.files[0];
+     const name = zipFile.name.replace(".backup", "");
 
      if (zipFile) {
       statusDiv.textContent = "Loading and fixing backup...";
@@ -65,7 +66,7 @@
          level: 9
         }
        });
-       saveAs(modifiedZip, "InnerTune_fixed.backup");
+       saveAs(modifiedZip, name + "_fixed.backup");
        statusDiv.textContent = "Backup fixed and saved!";
       } catch (error) {
        console.error("Error modifying zip:", error);
